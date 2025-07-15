@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#333" />
+  <title>Site Tracker</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      height: 100%;
+      background: #f8f8f8;
+      display: flex;
+      flex-direction: column;
+    }
+
+    button {
+      touch-action: manipulation;
+      font-size: 16px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .scroll-status-bar {
+      display: flex;
+      overflow-x: auto;
+      padding: 0.5em;
+      background: #f0f0f0;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .status-box {
+      min-width: 2.5em;
+      height: 2.5em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      border-radius: 5px;
+      margin: 0 0.25em;
+      scroll-snap-align: center;
+      color: white;
+      font-size: 1em;
+      border: 2px solid #999;
+      flex-shrink: 0;
+    }
+
+    .status-box.current {
+      outline: 3px solid #000;
+      outline-offset: 2px;
+    }
+
+    .status-box.empty { background: #ccc; color: #666; }
+    .status-box.occupied { background: #2ecc71; }
+    .status-box.empty-status { background: #e74c3c; }
+    .status-box.issue { background: #f1c40f; color: #000; }
+
+    header {
+      background: #333;
+      color: white;
+      padding: 1em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header button {
+      background: #555;
+      color: white;
+      border: none;
+      padding: 0.5em 1em;
+      font-size: 16px;
+      border-radius: 5px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 1em;
+      font-size: 1.5em;
+      width: 100%;
+    }
+
+    .main-buttons {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+    }
+
+    .main-buttons button {
+      flex: 1;
+      font-size: 1.5em;
+      margin: 0.2em;
+      border: none;
+      border-radius: 10px;
+      color: black;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .selected {
+      box-shadow:
+        inset 3px 3px 6px rgba(0, 0, 0, 0.5),
+        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+      transform: translateY(2px);
+      filter: brightness(0.9);
+      border: 2px solid rgba(0,0,0,0.4);
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      padding: 1em;
+      background: #ddd;
+    }
+
+    nav button {
+      flex: 1;
+      margin: 0 0.5em;
+      font-size: 16px;
+      padding: 1em;
+      border-radius: 5px;
+    }
+
+    #reportModal, #selectorModal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: none;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    #reportModal .content, #selectorModal .content {
+      background: #222;
+      padding: 1em;
+      flex: 1;
+    }
+
+    #reportModal pre {
+      white-space: pre-wrap;
+    }
+
+    .selector-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+      background: #222;
+      padding: 1em;
+      position: sticky;
+      top: 0;
+      z-index: 11;
+    }
+
+    .selector-controls button,
+    .selector-controls select,
+    .selector-controls input[type="date"] {
+      flex: 1 1 calc(33% - 1em);
+      font-size: 16px;
+      padding: 0.5em;
+      border-radius: 5px;
+      background: #444;
+      color: white;
+      border: none;
+    }
+
+    .selector-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+      padding: 1em;
+    }
+
+    .selector-grid button {
+      flex: 0 0 calc(33.333% - 1em);
+      height: 3em;
+      font-size: 1.2em;
+      font-weight: bold;
+      text-align: center;
+      border-radius: 10px;
+      color: white;
+      background-color: #aa2e2e;
+      border: 2px solid #aa2e2e;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+  margin-right: 1em;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0;
+  right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #2ecc71;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+    .selector-grid button.active {
+      background-color: #2ecc71 !important;
+      border-color: #2ecc71 !important;
+    }
+
+    @media (max-width: 600px) {
+      .selector-grid button {
+        flex: 0 0 calc(33.333% - 1em);
+        font-size: 1em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="statusScrollBar" class="scroll-status-bar"></div>
+
+  <header>
+    <button onclick="showSelector()">🔘 Select</button>
+    <div class="info-row">
+      <div id="numberDisplayBox"><div id="numberDisplay">--</div></div>
+      <div id="groupDisplayBox"><div id="groupDisplay"></div></div>
+      <div id="upcomingDisplayBox"><div id="upcomingDisplay">Next: —</div></div>
+    </div>
+  </header>
+
+  <div class="main-buttons" id="statusButtons">
+    <button id="occupiedBtn" onclick="selectStatus('Occupied')">Occupied</button>
+    <button id="emptyBtn" onclick="selectStatus('Empty')">Empty</button>
+    <button id="issueBtn" onclick="selectStatus('Issue')">Issue</button>
+  </div>
+
+  <nav>
+    <button onclick="prevNumber()">⬅ Previous</button>
+    <button onclick="nextNumber()">Next ➡</button>
+    <button onclick="showReport()">📋 Report</button>
+  </nav>
+
+  <div id="reportModal">
+    <button onclick="hideReport()">Close Report</button>
+    <div class="content">
+      <pre id="reportContent"></pre>
+    </div>
+  </div>
+
+  <div id="selectorModal">
+    <div class="selector-controls">
+      <input type="date" id="datePicker" />
+     <label class="switch">
+  <input type="checkbox" id="stateToggleCheckbox">
+  <span class="slider"></span>
+</label>
+<span id="stateLabel">Outgoing</span>
+      <button onclick="hideSelector()">✅ Done</button>
+      <button onclick="clearSelections()">🗑️ Clear</button>
+      <button onclick="resetStatuses()">♻️ Reset</button>
+    </div>
+    <div class="content">
+      <div class="selector-grid" id="selectorGrid"></div>
+    </div>
+  </div>
+
+  <script>
+    const total = 80;
+    let selectedNumbers = [];
+    let currentIndex = -1;
+    let selectedDate = new Date().toISOString().slice(0, 10);
+    let selectedState = "outgoing";
+
+    document.getElementById("datePicker").value = selectedDate;
+    document.getElementById("datePicker").onchange = (e) => {
+      selectedDate = e.target.value;
+      reloadFromStorage();
+    };
+
+    const stateToggleCheckbox = document.getElementById("stateToggleCheckbox");
+const stateLabel = document.getElementById("stateLabel");
+
+stateToggleCheckbox.addEventListener("change", () => {
+  selectedState = stateToggleCheckbox.checked ? "incoming" : "outgoing";
+  stateLabel.textContent = selectedState.charAt(0).toUpperCase() + selectedState.slice(1);
+  reloadFromStorage();
+});
+
+    function storagePrefix() {
+      return `${selectedDate}_${selectedState}`;
+    }
+
+    function updatePage() {
+      const current = selectedNumbers[currentIndex];
+      if (current === undefined) {
+        document.getElementById('numberDisplay').textContent = '--';
+        document.getElementById('groupDisplay').textContent = '';
+        document.getElementById('statusButtons').style.display = 'none';
+        document.getElementById('upcomingDisplay').textContent = '';
+        updateScrollBar();
+        return;
+      }
+
+      document.getElementById('numberDisplay').textContent = current;
+      document.getElementById('groupDisplay').textContent = '';
+      document.getElementById('statusButtons').style.display = 'flex';
+      highlightSelected(loadStatus(current));
+
+      const nextThree = selectedNumbers.slice(currentIndex + 1, currentIndex + 4);
+      document.getElementById('upcomingDisplay').textContent =
+        nextThree.length ? `Next: ${nextThree.join(', ')}` : 'Next: —';
+
+      updateScrollBar();
+    }
+
+    function updateScrollBar() {
+      const bar = document.getElementById('statusScrollBar');
+      bar.innerHTML = '';
+      selectedNumbers.forEach((n, i) => {
+        const box = document.createElement('div');
+        box.textContent = n;
+        box.classList.add('status-box');
+
+        const status = loadStatus(n);
+        if (n === selectedNumbers[currentIndex]) box.classList.add('current');
+        if (status === 'Occupied') box.classList.add('occupied');
+        else if (status === 'Empty') box.classList.add('empty-status');
+        else if (status === 'Issue') box.classList.add('issue');
+        else box.classList.add('empty');
+
+        bar.appendChild(box);
+      });
+
+      const currentBox = bar.querySelector('.current');
+      if (currentBox) currentBox.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+    }
+
+    function selectStatus(status) {
+      const number = selectedNumbers[currentIndex];
+      localStorage.setItem(`${storagePrefix()}_status_${number}`, status);
+      highlightSelected(status);
+      updateScrollBar();
+      nextNumber();
+    }
+
+    function highlightSelected(status) {
+      document.getElementById("occupiedBtn").classList.toggle("selected", status === "Occupied");
+      document.getElementById("emptyBtn").classList.toggle("selected", status === "Empty");
+      document.getElementById("issueBtn").classList.toggle("selected", status === "Issue");
+    }
+
+    function loadStatus(n) {
+      return localStorage.getItem(`${storagePrefix()}_status_${n}`) || '';
+    }
+
+    function prevNumber() {
+      if (currentIndex > 0) currentIndex--;
+      updatePage();
+    }
+
+    function nextNumber() {
+      if (currentIndex < selectedNumbers.length - 1) currentIndex++;
+      updatePage();
+    }
+
+    function showReport() {
+      let content = '';
+      selectedNumbers.forEach(n => {
+        const status = loadStatus(n);
+        if (status) content += `${n}: ${status}\n`;
+      });
+      document.getElementById('reportContent').textContent = content || 'No statuses set.';
+      document.getElementById('reportModal').style.display = 'flex';
+    }
+
+    function hideReport() {
+      document.getElementById('reportModal').style.display = 'none';
+    }
+
+    function showSelector() {
+      document.getElementById('selectorModal').style.display = 'flex';
+    }
+
+    function hideSelector() {
+      document.getElementById('selectorModal').style.display = 'none';
+      saveSelections();
+      currentIndex = 0;
+      updatePage();
+    }
+
+    function saveSelections() {
+      const selected = [];
+      document.querySelectorAll('.selector-grid button.active').forEach(btn => {
+        selected.push(parseInt(btn.dataset.number));
+      });
+      selected.sort((a, b) => a - b);
+      selectedNumbers = selected;
+      localStorage.setItem(`${storagePrefix()}_selectedNumbers`, JSON.stringify(selectedNumbers));
+    }
+
+    function clearSelections() {
+      if (!confirm("Clear all selected numbers?")) return;
+      document.querySelectorAll('#selectorGrid button.active').forEach(btn => btn.classList.remove('active'));
+      selectedNumbers = [];
+      currentIndex = -1;
+      localStorage.removeItem(`${storagePrefix()}_selectedNumbers`);
+      updatePage();
+    }
+
+    function resetStatuses() {
+      if (!confirm("Clear all statuses for selected numbers?")) return;
+      selectedNumbers.forEach(n => localStorage.removeItem(`${storagePrefix()}_status_${n}`));
+      updatePage();
+    }
+
+    function setupSelector() {
+      const grid = document.getElementById('selectorGrid');
+      for (let i = 1; i <= total; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.dataset.number = i;
+        btn.onclick = () => btn.classList.toggle('active');
+        grid.appendChild(btn);
+      }
+    }
+
+    function reloadFromStorage() {
+      const raw = localStorage.getItem(`${storagePrefix()}_selectedNumbers`);
+      selectedNumbers = raw ? JSON.parse(raw) : [];
+      currentIndex = 0;
+      document.querySelectorAll('#selectorGrid button').forEach(btn => {
+        btn.classList.toggle('active', selectedNumbers.includes(parseInt(btn.dataset.number)));
+      });
+      updatePage();
+    }
+
+    setupSelector();
+    reloadFromStorage();
+    // Set initial toggle state
+stateToggleCheckbox.checked = (selectedState === "incoming");
+stateLabel.textContent = selectedState.charAt(0).toUpperCase() + selectedState.slice(1);
+  </script>
+</body>
+</html>
